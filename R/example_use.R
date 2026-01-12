@@ -21,7 +21,7 @@ token <- key_get("rmis_api", "token")
 loc_all <- get_location(token = token)
 
 
-######split location data into LUTS by location type. This would be a great application of a helper function
+######split location data into LUTS by location type. This could be a future application of a helper function
 
 #release LUT
 relt <- loc_all |> 
@@ -83,11 +83,13 @@ stockt <- loc_all |>
 
 ########################## base r variant
 
-# 1. Setup parameters- rmisr assumes some familiarity
+# 1. Set up parameters- rmisr assumes some familiarity
 # with labeling conventions within rmis.
 # note: this may be a barrier to entry and require 
-# frequent reference to the data specifications document
+# frequent reference to the data specifications document:
+#https://www.rmpc.org/wp-content/uploads/2023/11/Specification-V4.2-2023-12.pdf
 
+#hatchery of interest location codes, found on the hatt data frame
 hatchery <- c("3F42001  270017 H",
               "3F42001  270002 H")
 
@@ -101,8 +103,9 @@ query_grid <- expand.grid(brood_year = years,
                           species = species)
 
 
-# 2. Initialize a list and progress bar
+# 2. Initialize a releases list and progress bar
 rel_list <- vector("list", nrow(query_grid))
+
 pb <- txtProgressBar(min = 0, max = nrow(query_grid), style = 3)
 
 # 3. The release loop
@@ -124,16 +127,17 @@ for (i in 1:nrow(query_grid)) {
 }
 close(pb)
 
-# 4. Bind all results into a single data frame
+# 4. Bind all results into a single data frame, and use the distinct call to remove redundant rows
 rel_df <- do.call(rbind, rel_list) |> 
   distinct()
 
-#### 5. Set recovery parameters. rmisr assumes some familiarity with the data spec, in this case we'll use the tag codes from the release query
+#### 5. Set recovery parameters. 
+#again, rmisr assumes some familiarity with the data spec- in this case we'll use the tag codes from the release query
 
 tags <- rel_df$tag_code_or_release_id
 
 #repeating process from before, this step is unneccessary but we'll leave it to allow for addition of more parameters into the grid.
-# note- column names must match the headings from the recovery table
+# note- column names must match the headings from the recoveries table
 query_grid <- expand.grid(tag_code = tags)
 
 #initialize recovery list and the progress bar
@@ -162,7 +166,8 @@ rec_df <- do.call(rbind, rec_list) |>
 #understanding of rmis's data structure. See comments below.
 
 rec1 <- rec_df |> 
-  filter(tag_status == 1,#tag status 1 are only verified tag recoveries/reads. no mismatched data such as a field call that doesn't match a tag code for species id
+  filter(tag_status == 1,#tag status 1 are only verified tag recoveries/reads. 
+         #result will not include mismatched data such as a field call that doesn't match a tag code for species id
          fishery %in% c(50,
                         52,
                         54)) |> 
@@ -182,10 +187,9 @@ combined_df <- rec1 |>
                              release_location_name)), by = c("tag_code" = "tag_code_or_release_id")) |>
   mutate(hatchery_name = case_when(is.na(hatchery_name) ~ stock_name, #this line substitutes hatchery-less releases with their associated stocks to avoid NAs
                                    TRUE ~ hatchery_name)) |> 
-  drop_na(number_cwt_estimated)
+  drop_na(number_cwt_estimated) #remove NAs in the expanded cwt estimates in order to allow for summation
 
-##annual sums by whatever you choose
-
+##annual sums by chosen criterion
 rec_summary <- combined_df |>
   group_by(#hatchery_name,
     run_year,
@@ -200,5 +204,5 @@ rec_summary <- combined_df |>
 ggplot(rec_summary, aes(x = (run_year), y = (total_estd_cwt_recovered), fill = fishery)) +
   geom_col() +
   scale_x_continuous(breaks = c(2021, 2022, 2023, 2024)) +
-  labs(title = "Estimated recovery of Kalama CWTs in terminal areas (2021-2024)",
+  labs(title = "Estimated recovery of Kalama River Hatchery CWTs in terminal areas (2021-2024)",
        x = "Run Year", y = "Total Estimated Coded Wire Recoveries")
