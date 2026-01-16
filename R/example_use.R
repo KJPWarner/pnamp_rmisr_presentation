@@ -189,7 +189,7 @@ combined_df <- rec1 |>
                                    TRUE ~ hatchery_name)) |> 
   drop_na(number_cwt_estimated) #remove NAs in the expanded cwt estimates in order to allow for summation
 
-##annual sums by chosen criterion
+##annual sums by chosen criteria
 rec_summary <- combined_df |>
   group_by(#hatchery_name,
     run_year,
